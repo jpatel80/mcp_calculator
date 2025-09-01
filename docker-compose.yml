@@ -1,0 +1,13 @@
+services:
+  calculator-mcp-server:
+    build:
+      context: .
+      dockerfile: src/Dockerfile
+    environment:
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+    restart: unless-stopped
+    command: tail -f /dev/null
+
