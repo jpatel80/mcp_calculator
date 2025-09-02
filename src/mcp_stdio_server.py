@@ -45,7 +45,7 @@ class MCPServer:
         }
         
         self.send_response({
-            "protocolVersion": "2025-06-18",
+            "protocolVersion": "2024-11-05",
             "capabilities": capabilities,
             "serverInfo": {
                 "name": "calculator-mcp-server",
@@ -110,7 +110,20 @@ class MCPServer:
     
     def handle_tools_call(self, params: Dict[str, Any]):
         """Handle tools/call request."""
+        # Try different possible field names for tool calls
         tool_calls = params.get("calls", [])
+        if not tool_calls:
+            tool_calls = params.get("toolCalls", [])
+        if not tool_calls:
+            tool_calls = params.get("tool_calls", [])
+        
+        # Handle case where Claude Desktop sends tool call directly in params
+        if not tool_calls and "name" in params and "arguments" in params:
+            tool_calls = [{"name": params["name"], "arguments": params["arguments"]}]
+            logger.info(f"Detected direct tool call in params: {tool_calls}")
+        
+        logger.info(f"Received tool calls: {tool_calls}")
+        logger.info(f"Full params: {params}")
         results = []
         
         for call in tool_calls:
@@ -129,19 +142,30 @@ class MCPServer:
                 else:
                     result = {"error": f"Unknown tool: {tool_name}"}
                 
-                results.append({
-                    "name": tool_name,
-                    "content": [{"type": "text", "text": str(result.get("result", result.get("error", "Unknown error")))}]
-                })
+                # Return the actual result value in the format Claude Desktop expects
+                if "result" in result:
+                    results.append({
+                        "type": "text",
+                        "text": str(result["result"])
+                    })
+                else:
+                    results.append({
+                        "type": "text",
+                        "text": f"Error: {result.get('error', 'Unknown error')}"
+                    })
                 
             except Exception as e:
                 logger.error(f"Error executing tool {tool_name}: {str(e)}")
                 results.append({
-                    "name": tool_name,
-                    "content": [{"type": "text", "text": f"Error: {str(e)}"}]
+                    "type": "text",
+                    "text": f"Error: {str(e)}"
                 })
         
-        self.send_response({"content": results})
+        # Return results in the format expected by Claude Desktop
+        # MCP tools/call expects a specific response structure
+        self.send_response({
+            "content": results
+        })
     
     def handle_request(self, request: Dict[str, Any]):
         """Handle incoming requests."""
@@ -150,6 +174,7 @@ class MCPServer:
         self.request_id = request.get("id", 0)
         
         logger.info(f"Handling request: {method}")
+        logger.info(f"Full request: {request}")
         
         try:
             if method == "initialize":
