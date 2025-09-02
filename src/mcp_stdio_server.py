@@ -36,6 +36,10 @@ class MCPServer:
         logger.info("Initializing MCP server")
         self.initialized = True
         
+        # Use the client's protocol version if available, otherwise default to 2024-11-05
+        client_protocol_version = params.get("protocolVersion", "2024-11-05")
+        logger.info(f"Client protocol version: {client_protocol_version}")
+        
         # Return server capabilities
         capabilities = {
             "tools": {
@@ -45,7 +49,7 @@ class MCPServer:
         }
         
         self.send_response({
-            "protocolVersion": "2024-11-05",
+            "protocolVersion": client_protocol_version,
             "capabilities": capabilities,
             "serverInfo": {
                 "name": "calculator-mcp-server",
@@ -179,6 +183,10 @@ class MCPServer:
         try:
             if method == "initialize":
                 self.handle_initialize(params)
+            elif method == "notifications/initialized":
+                # Handle initialization notification (no response needed)
+                logger.info("Received initialization notification")
+                return
             elif method == "tools/list":
                 self.handle_tools_list(params)
             elif method == "tools/call":
