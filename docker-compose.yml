@@ -1,5 +1,6 @@
 services:
-  calculator-mcp-server:
+  # Stdio-based MCP server (existing)
+  calculator-mcp-server-stdio:
     build:
       context: .
       dockerfile: src/Dockerfile
@@ -10,4 +11,26 @@ services:
       - ./tests:/app/tests
     restart: unless-stopped
     command: tail -f /dev/null
+
+  # StreamableHttp-based MCP server (new)
+  calculator-mcp-server-streamablehttp:
+    build:
+      context: .
+      dockerfile: src/Dockerfile.streamablehttp
+    environment:
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 

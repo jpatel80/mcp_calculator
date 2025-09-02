@@ -31,6 +31,11 @@ make setup
 docker compose up --build -d
 ```
 
+### 2. Choose Your Transport
+
+**For Claude Desktop (Recommended)**: Use the stdio transport (see detailed setup below)  
+**For Cloud/Remote Access**: Use the StreamableHttp transport with `mcp-remote`
+
 ### 2. Verify Server is Running
 
 ```bash
@@ -47,7 +52,26 @@ Follow the detailed setup instructions below to connect this MCP server to Claud
 
 ## Claude Desktop MCP Setup
 
-### Step 1: Prepare the MCP Server
+### Transport Options
+
+This MCP server supports two transport types:
+
+1. **Stdio Transport** (Recommended for Claude Desktop) - Direct process communication
+   - Best for local development and testing
+   - Requires Docker to be running
+   - Direct process-to-process communication
+
+2. **StreamableHttp Transport** - HTTP-based communication using FastAPI framework
+   - Best for cloud deployment and remote access
+   - Uses `mcp-remote` tool for Claude Desktop integration
+   - Works from anywhere with internet access
+   - No local Docker dependencies for clients
+   - **FastAPI framework** - modern, fast web framework for Python
+   - **Efficient MCP protocol handling** - optimized request processing
+
+### Option 1: Stdio Transport (Recommended)
+
+#### Step 1: Prepare the MCP Server
 
 1. **Start the server** (if not already running):
    ```bash
@@ -115,6 +139,120 @@ Follow the detailed setup instructions below to connect this MCP server to Claud
 5. **Save and Restart**:
    - Save the config file
    - Restart Claude Desktop for changes to take effect
+
+### Option 2: StreamableHttp Transport
+
+The StreamableHttp transport provides HTTP-based communication using the FastMCP framework. This implementation ensures stateless operation (no memory held between requests) and is useful for cloud deployments and web-based clients.
+
+#### Step 1: Start the StreamableHttp Server
+
+1. **Start both servers**:
+   ```bash
+   docker compose up --build -d
+   ```
+
+2. **Verify both servers are running**:
+   ```bash
+   docker compose ps
+   ```
+
+   You should see both containers running:
+   - `calculator-mcp-server-stdio` (stdio transport)
+   - `calculator-mcp-server-streamablehttp` (HTTP transport on port 8000)
+
+#### Step 2: Test the StreamableHttp Server
+
+1. **Test the health endpoint**:
+   ```bash
+   curl http://localhost:8000/health
+   ```
+
+2. **Test the MCP endpoint**:
+   ```bash
+   curl -X POST http://localhost:8000/mcp \
+     -H "Content-Type: application/json" \
+     -d '{
+       "jsonrpc": "2.0",
+       "id": 1,
+       "method": "tools/list",
+       "params": {}
+     }'
+   ```
+
+3. **Test the MCP endpoint**:
+   ```bash
+   curl -X POST http://localhost:8000/mcp \
+     -H "Content-Type: application/json" \
+     -d '{
+       "jsonrpc": "2.0",
+       "id": 1,
+       "method": "tools/list",
+       "params": {}
+     }'
+   ```
+
+#### Step 3: Configure Claude Desktop for StreamableHttp
+
+**Recommended Method**: Use the `mcp-remote` tool for seamless Claude Desktop integration.
+
+Add this configuration to your Claude Desktop config file:
+
+```json
+{
+  "mcpServers": {
+    "calculator-mcp-streamablehttp": {
+      "command": "npx",
+      "args": ["mcp-remote", "http://localhost:8000/mcp"]
+    }
+  }
+}
+```
+
+**Alternative Methods** (if the above doesn't work):
+
+1. **Direct HTTP Configuration**:
+```json
+{
+  "mcpServers": {
+    "calculator-mcp-http": {
+      "command": "curl",
+      "args": ["-X", "POST", "http://localhost:8000/mcp", "-H", "Content-Type: application/json", "-d"],
+      "env": {
+        "MCP_SERVER_URL": "http://localhost:8000/mcp"
+      }
+    }
+  }
+}
+```
+
+2. **Testing with MCP Inspector**:
+```bash
+npx @modelcontextprotocol/inspector http http://localhost:8000/mcp
+```
+
+**Note**: The `mcp-remote` approach is recommended as it provides the cleanest integration and handles HTTP communication automatically.
+
+#### Step 4: Cloud Deployment
+
+When deploying your StreamableHttp MCP server to the cloud, simply update the URL in your Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "calculator-mcp-streamablehttp": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://your-cloud-server.com/mcp"]
+    }
+  }
+}
+```
+
+**Benefits of StreamableHttp for Cloud Deployment:**
+- **No Docker dependencies** on the client side
+- **Standard HTTP communication** over any network
+- **Easy scaling** and load balancing
+- **Firewall friendly** (uses standard web ports)
+- **Works from anywhere** with internet access
 
 ### Step 3: Using the Calculator in Claude
 
@@ -272,13 +410,23 @@ All testing is performed in Docker containers for consistency:
 
 ```bash
 # Run all tests
-docker compose exec calculator-mcp-server bash -c "cd tests && python -m pytest -v"
+docker compose exec calculator-mcp-server-stdio bash -c "cd tests && python -m pytest -v"
 
 # Run tests with coverage
-docker compose exec calculator-mcp-server bash -c "cd tests && python -m pytest --cov=../src --cov-report=term-missing"
+docker compose exec calculator-mcp-server-stdio bash -c "cd tests && python -m pytest --cov=../src --cov-report=term-missing"
 
 # Run specific test file
-docker compose exec calculator-mcp-server bash -c "cd tests && python -m pytest test_calculator.py -v"
+docker compose exec calculator-mcp-server-stdio bash -c "cd tests && python -m pytest test_calculator.py -v"
+```
+
+### Testing the StreamableHttp Server
+
+```bash
+# Run StreamableHttp server tests
+docker compose exec calculator-mcp-server-streamablehttp bash -c "cd tests && python -m pytest test_streamablehttp_mcp_server.py -v"
+
+# Run all tests including StreamableHttp
+docker compose exec calculator-mcp-server-streamablehttp bash -c "cd tests && python -m pytest -v"
 ```
 
 ### Code Quality Checks
@@ -328,9 +476,11 @@ environment:
 ├── Makefile              # Convenient commands for setup and management
 ├── docker-compose.yml    # Docker Compose configuration
 ├── src/
-│   ├── Dockerfile        # Container configuration
+│   ├── Dockerfile        # Container configuration (stdio mode)
+│   ├── Dockerfile.streamablehttp # Container configuration (StreamableHttp mode)
 │   ├── requirements.txt  # Python dependencies
-│   ├── mcp_stdio_server.py # Main MCP server
+│   ├── mcp_stdio_server.py # Stdio-based MCP server
+│   ├── mcp_streamable_http_server.py # StreamableHttp-based MCP server (FastAPI)
 │   ├── calculator/       # Calculator operations
 │   │   ├── __init__.py
 │   │   ├── operations.py # Arithmetic operations
@@ -340,7 +490,8 @@ environment:
 │       └── logger.py    # Logging configuration
 └── tests/
     ├── pytest.ini       # Pytest configuration
-    └── test_calculator.py # Calculator tests
+    ├── test_calculator.py # Calculator tests
+    └── test_streamablehttp_mcp_server.py # StreamableHttp MCP server tests
 ```
 
 ## Troubleshooting
@@ -376,6 +527,21 @@ environment:
    - **If you see "address already in use" error**: The HTTP server is conflicting. Use the stdio MCP server instead.
    - **If Docker command fails**: Try the direct Python configuration as a fallback
    - Restart Claude Desktop after making config changes
+
+4. **StreamableHttp server issues**:
+   - Check if both containers are running: `docker compose ps`
+   - Verify the StreamableHttp server is accessible: `curl http://localhost:8000/health`
+   - Check StreamableHttp server logs: `docker compose logs calculator-mcp-server-streamablehttp`
+   - Ensure port 8000 is not already in use by another service
+   - Test the MCP endpoint: `curl -X POST http://localhost:8000/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'`
+
+5. **Claude Desktop StreamableHttp connection issues**:
+   - Ensure `npx` is available in your system PATH
+   - Verify the StreamableHttp server is running and accessible
+   - Check Claude Desktop logs for MCP connection errors
+   - Test the connection manually: `npx mcp-remote http://localhost:8000/mcp`
+   - If using cloud deployment, ensure the URL is accessible from your network
+   - Verify firewall settings allow HTTP connections to the server port
 
 4. **Tests failing**:
    ```bash
