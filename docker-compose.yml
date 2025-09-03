@@ -1,22 +1,9 @@
 services:
-  # Stdio-based MCP server (existing)
-  calculator-mcp-server-stdio:
+  # Consolidated Calculator MCP Server
+  calculator-mcp-server:
     build:
       context: .
       dockerfile: src/Dockerfile
-    environment:
-      - LOG_LEVEL=INFO
-    volumes:
-      - ./src:/app/src
-      - ./tests:/app/tests
-    restart: unless-stopped
-    command: tail -f /dev/null
-
-  # StreamableHttp-based MCP server (new)
-  calculator-mcp-server-streamablehttp:
-    build:
-      context: .
-      dockerfile: src/Dockerfile.streamablehttp
     environment:
       - LOG_LEVEL=INFO
       - HOST=0.0.0.0
@@ -33,4 +20,4 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
+    command: python src/main.py  # Launches HTTP server by default

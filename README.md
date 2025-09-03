@@ -54,35 +54,36 @@ Follow the detailed setup instructions below to connect this MCP server to Claud
 
 ### Transport Options
 
-This MCP server supports two transport types:
+This MCP server now uses **StreamableHttp transport by default** for simplified deployment:
 
-1. **Stdio Transport** (Recommended for Claude Desktop) - Direct process communication
-   - Best for local development and testing
-   - Requires Docker to be running
-   - Direct process-to-process communication
+**StreamableHttp Transport** - HTTP-based communication using FastAPI framework
+- **Default mode**: Launches automatically when running `python src/main.py`
+- **Best for**: Cloud deployment, remote access, and Docker containers
+- **Uses**: `mcp-remote` tool for Claude Desktop integration
+- **Works from**: Anywhere with internet access
+- **No local Docker dependencies** for clients
+- **FastAPI framework**: Modern, fast web framework for Python
+- **Efficient MCP protocol handling**: Optimized request processing
 
-2. **StreamableHttp Transport** - HTTP-based communication using FastAPI framework
-   - Best for cloud deployment and remote access
-   - Uses `mcp-remote` tool for Claude Desktop integration
-   - Works from anywhere with internet access
-   - No local Docker dependencies for clients
-   - **FastAPI framework** - modern, fast web framework for Python
-   - **Efficient MCP protocol handling** - optimized request processing
+### Option 1: StreamableHttp Transport (Default & Recommended)
 
-### Option 1: Stdio Transport (Recommended)
+**This is now the default transport mode** and works perfectly in Docker containers.
 
-#### Step 1: Prepare the MCP Server
+#### Step 1: Start the MCP Server
 
-1. **Start the server** (if not already running):
+1. **Using Docker (Recommended)**:
    ```bash
-   make setup
+   docker compose up calculator-mcp-server -d
    ```
 
-2. **Verify the server is accessible**:
+2. **Or manually**:
    ```bash
-   make verify
+   cd src
+   pip install -r requirements.txt
+   python src/main.py
    ```
-   The server should start and wait for input via stdin.
+
+The server will automatically start in HTTP mode on port 8000.
 
 ### Step 2: Configure Claude Desktop
 
@@ -158,7 +159,7 @@ The StreamableHttp transport provides HTTP-based communication using the FastMCP
 
    You should see both containers running:
    - `calculator-mcp-server-stdio` (stdio transport)
-   - `calculator-mcp-server-streamablehttp` (HTTP transport on port 8000)
+   - `calculator-mcp-server` (HTTP transport on port 8000)
 
 #### Step 2: Test the StreamableHttp Server
 
@@ -423,10 +424,10 @@ docker compose exec calculator-mcp-server-stdio bash -c "cd tests && python -m p
 
 ```bash
 # Run StreamableHttp server tests
-docker compose exec calculator-mcp-server-streamablehttp bash -c "cd tests && python -m pytest test_streamablehttp_mcp_server.py -v"
+docker compose exec calculator-mcp-server bash -c "cd tests && python -m pytest test_streamablehttp_mcp_server.py -v"
 
 # Run all tests including StreamableHttp
-docker compose exec calculator-mcp-server-streamablehttp bash -c "cd tests && python -m pytest -v"
+docker compose exec calculator-mcp-server bash -c "cd tests && python -m pytest -v"
 ```
 
 ### Code Quality Checks
@@ -531,7 +532,7 @@ environment:
 4. **StreamableHttp server issues**:
    - Check if both containers are running: `docker compose ps`
    - Verify the StreamableHttp server is accessible: `curl http://localhost:8000/health`
-   - Check StreamableHttp server logs: `docker compose logs calculator-mcp-server-streamablehttp`
+   - Check StreamableHttp server logs: `docker compose logs calculator-mcp-server`
    - Ensure port 8000 is not already in use by another service
    - Test the MCP endpoint: `curl -X POST http://localhost:8000/mcp -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'`
 
